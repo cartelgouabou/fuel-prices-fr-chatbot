@@ -1,6 +1,11 @@
 
-venv*
+# Ignore all Jupyter Notebook files
 *.ipynb
+
+# Ignore the entire data directory
 data/
-data/*
-*/*.ipynb
+
+# Ignore virtual environment directories
+venv/
+.env
+venv*
