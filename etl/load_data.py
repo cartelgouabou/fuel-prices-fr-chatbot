@@ -1,11 +1,19 @@
+import os
 import sqlite3
 import pandas as pd
-import os
 import logging
 from utilities.utils import get_latest_processed_file
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
+
+# Automatically define data_path as '../data'
+data_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '../data'))
+
+# Check if data directory exists, if not log a message and exit
+if not os.path.exists(data_path):
+    logging.error("Data directory not found. Please run fetch_data.py first.")
+    exit(1)
 
 def initialize_database(data_path):
     """
@@ -131,6 +139,5 @@ def load_latest_processed_data(data_path):
         logging.info(f"Inserted {len(df_new)} new or updated records into the database.")
 
 if __name__ == "__main__":
-    data_path = r"E:\My_Github\fr-fuel-price-tracking\data"
     initialize_database(data_path)
     load_latest_processed_data(data_path)

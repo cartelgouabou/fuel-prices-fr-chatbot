@@ -9,3 +9,7 @@ data/
 venv/
 .env
 venv*
+
+models/
+notebooks/
+

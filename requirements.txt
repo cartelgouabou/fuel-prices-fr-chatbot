@@ -1,0 +1,13 @@
+--extra-index-url https://download.pytorch.org/whl/cpu
+
+pandas==2.2.3
+requests==2.32.3
+sentence_transformers==3.4.1
+faiss-cpu==1.10.0
+streamlit==1.43.2
+langchain-community==0.3.20
+transformers==4.50.0
+
+torch==2.6.0+cpu
+torchvision==0.21.0+cpu
+torchaudio==2.6.0+cpu
