@@ -1,4 +1,4 @@
-# 🚗 fr-fuel-price-tracking
+# 🚗 fuel-prices-fr-chatbot
 
 A fully functional end-to-end ETL + Chatbot pipeline to track and explore **fuel prices in France**, combining:
 
@@ -12,7 +12,7 @@ A fully functional end-to-end ETL + Chatbot pipeline to track and explore **fuel
 ## ♻️ Project Structure
 
 ```
-fr-fuel-price-tracking/
+fuel-prices-fr-chatbot/
 ├── app/                    # Streamlit chatbot app
 │   └── chatbot.py
 ├── data/                  # Data storage (raw, processed, embeddings, DB)
@@ -44,8 +44,8 @@ fr-fuel-price-tracking/
 
 ### 1. Clone the repo and create virtual environment
 ```bash
-$ git clone https://github.com/yourusername/fr-fuel-price-tracking.git
-$ cd fr-fuel-price-tracking
+$ git clone https://github.com/cartelgouabou/fuel-prices-fr-chatbot.git
+$ cd fuel-prices-fr-chatbot
 $ python -m venv venv-fuel
 $ source venv-fuel/bin/activate  # On Windows: venv-fuel\Scripts\activate
 ```
@@ -86,7 +86,7 @@ crontab -e
 
 2. Add the following line to run the ETL script every day at 3am:
 ```bash
-0 3 * * * /path/to/venv-fuel/bin/python /path/to/fr-fuel-price-tracking/etl/run_etl.py >> /path/to/fr-fuel-price-tracking/logs/etl_cron.log 2>&1
+0 3 * * * /path/to/venv-fuel/bin/python /path/to/fuel-prices-fr-chatbot/etl/run_etl.py >> /path/to/fuel-prices-fr-chatbot/logs/etl_cron.log 2>&1
 ```
 
 - Replace `/path/to/venv-fuel` and project path accordingly
@@ -102,7 +102,7 @@ crontab -e
 Program/script:
     C:\path\to\venv-fuel\Scripts\python.exe
 Add arguments:
-    C:\path\to\fr-fuel-price-tracking\etl\run_etl.py
+    C:\path\to\fuel-prices-fr-chatbot\etl\run_etl.py
 ```
 
 Ensure that the task is allowed to run with the correct user permissions.
