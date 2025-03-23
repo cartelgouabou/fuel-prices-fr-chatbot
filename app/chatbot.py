@@ -1,148 +1,164 @@
-import streamlit as st  # Streamlit for building the web UI
-import faiss  # Facebook AI Similarity Search for fast vector search
-import pickle  # For loading serialized Python objects (e.g., metadata)
-from sentence_transformers import (
-    SentenceTransformer,
-)  # Pretrained sentence embedding model
-from transformers import (
-    AutoModelForCausalLM,
-    AutoTokenizer,
-)  # For loading the local language model
-import torch  # PyTorch for model inference
-import logging  # Logging utility
-import html  # For escaping HTML
-import streamlit.watcher.local_sources_watcher as lsw  # Streamlit's file-watching internals (for patching crash)
+import os
+import logging
+import pickle
+import faiss
+import torch
+import html
+import streamlit as st
+import numpy as np
+from datetime import datetime
+from flashtext import KeywordProcessor
+from sentence_transformers import SentenceTransformer
+from transformers import AutoModelForCausalLM, AutoTokenizer
+import streamlit.watcher.local_sources_watcher as lsw
 
-device = "cuda" if torch.cuda.is_available() else "cpu"
-# ==== Monkey-patch to avoid Streamlit crashing when inspecting torch.classes ====
+# Monkey-patch Streamlit to skip torch.classes which causes crashes
+original_get_module_paths = lsw.get_module_paths
+
+
 def safe_get_module_paths(module):
-    """
-    Safely extract module paths while ignoring problematic modules like `torch.classes`
-    that can crash Streamlit's file watcher.
-    """
-    from streamlit.watcher import util
-
+    if getattr(module, "__name__", "") == "torch.classes":
+        return []
     try:
-        # Only process modules that have a __name__ and __path__
-        if not hasattr(module, "__name__") or not hasattr(module, "__path__"):
-            return []
-        # Skip the problematic `torch.classes` module
-        if module.__name__ == "torch.classes":
-            return []
-        # Return paths that are safe to watch
-        return [p for p in module.__path__ if util.is_file_watched(p)]
+        return original_get_module_paths(module)
     except Exception:
         return []
 
 
-# Apply the patch to Streamlit's file watcher
 lsw.get_module_paths = safe_get_module_paths
 
-# ==== Logging Configuration ====
+
+# ========== Logging ==========
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
 )
 
-# ==== Paths ====
-VECTOR_STORE_PATH = "data/faiss_index"  # Path to FAISS vector index
-EMBEDDINGS_FILE = (
-    "data/embeddings.pkl"  # Path to pickled metadata aligned with embeddings
-)
-LOCAL_MODEL_PATH = "./models/tinyllama"  # Path to local TinyLlama model (HF format)
+# ========== Config ==========
+VECTOR_STORE_PATH = "data/faiss_index"
+EMBEDDINGS_FILE = "data/embeddings.pkl"
+LOCAL_MODEL_PATH = "./models/tinyllama"
+device = "cuda" if torch.cuda.is_available() else "cpu"
 
 
-# ==== Cached Resource: Sentence Embedding Model ====
+# ========== Cached Resources ==========
 @st.cache_resource
-# --------------------------------------------
-# @st.cache_resource
-# --------------------------------------------
-# This decorator tells Streamlit to cache the *resource* returned by this function
-# (such as a model or index), so it's only loaded once per session.
-# Unlike @st.cache_data (which is for immutable data like DataFrames),
-# @st.cache_resource is used for heavier, stateful objects like:
-# - HuggingFace models
-# - FAISS indexes
-# - Tokenizers
-# - PyTorch models
-#
-# This makes the app much faster when rerunning or updating widgets,
-# because these expensive operations don’t repeat unnecessarily.
-# --------------------------------------------
 def load_embed_model():
-    """Loads the MiniLM embedding model from Hugging Face."""
     return SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2")
 
 
-# ==== Cached Resource: Local LLM Model ====
 @st.cache_resource
 def load_llm_model():
-    """
-    Loads a local causal language model (TinyLlama) and tokenizer.
-    Model is set to eval mode and uses float32 precision.
-    """
     tokenizer = AutoTokenizer.from_pretrained(LOCAL_MODEL_PATH)
     model = AutoModelForCausalLM.from_pretrained(
-    LOCAL_MODEL_PATH, torch_dtype=torch.float16 if device == "cuda" else torch.float32
+        LOCAL_MODEL_PATH,
+        torch_dtype=torch.float16 if device == "cuda" else torch.float32,
     ).to(device)
-    model.eval()  # Set model to inference mode
+    model.eval()
     return tokenizer, model
 
 
-# ==== Cached Resource: FAISS Index & Metadata ====
 @st.cache_resource
 def load_faiss_index_and_metadata():
-    """
-    Loads the FAISS index used for similarity search and the associated metadata
-    (which maps embedding vectors back to real-world fuel station info).
-    """
     index = faiss.read_index(VECTOR_STORE_PATH)
     with open(EMBEDDINGS_FILE, "rb") as f:
         metadata_df = pickle.load(f)
     return index, metadata_df
 
 
-# ==== Core Logic: Find Similar Stations ====
-def find_similar_stations(query, index, metadata_df, embed_model, k=5):
-    """
-    Encodes a query into a vector, searches the FAISS index,
-    and returns the top-k most similar fuel stations with metadata.
-    """
-    query_embedding = embed_model.encode([query], convert_to_numpy=True)
-    distances, indices = index.search(query_embedding, k)  # FAISS search
-    results = metadata_df.iloc[indices[0]].copy()  # Retrieve metadata rows by index
-    results["distance"] = distances[0]  # Add distance (relevance) scores
-    return results
+@st.cache_resource
+def build_location_matchers(metadata_df):
+    def init_matcher(column):
+        matcher = KeywordProcessor()
+        for item in metadata_df[column].dropna().unique():
+            matcher.add_keyword(str(item).lower())
+        return matcher
+
+    return (
+        init_matcher("city"),
+        init_matcher("code_department"),
+        init_matcher("region"),
+    )
 
 
-# ==== Core Logic: Generate LLM Response ====
+# ========== Helper Functions ==========
+def get_latest_fetch_date():
+    """Extracts the latest fetch date based on raw_data_*.json filenames."""
+    data_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "../data"))
+    try:
+        files = [f for f in os.listdir(data_path) if f.startswith("raw_data_")]
+        dates = [
+            datetime.strptime(f.split("_")[-1].replace(".json", ""), "%Y-%m-%d").date()
+            for f in files
+        ]
+        return max(dates) if dates else None
+    except Exception:
+        return None
+
+
+def detect_location(query: str, city_matcher, dept_matcher, region_matcher) -> dict:
+    q = query.lower()
+    return {
+        "city": city_matcher.extract_keywords(q)[0]
+        if city_matcher.extract_keywords(q)
+        else None,
+        "department": dept_matcher.extract_keywords(q)[0]
+        if dept_matcher.extract_keywords(q)
+        else None,
+        "region": region_matcher.extract_keywords(q)[0]
+        if region_matcher.extract_keywords(q)
+        else None,
+    }
+
+
+def search_with_filter(query, embed_model, metadata_df, faiss_index, matchers):
+    city_matcher, dept_matcher, region_matcher = matchers
+    query_vec = embed_model.encode([query], convert_to_numpy=True)
+    distances, indices = faiss_index.search(query_vec, k=50)
+
+    results = metadata_df.iloc[indices[0]].copy()
+    results["distance"] = distances[0]
+    detected = detect_location(query, city_matcher, dept_matcher, region_matcher)
+
+    filtered = results
+    if detected["city"]:
+        filtered = results[results["city"].str.lower() == detected["city"]]
+    elif detected["department"]:
+        filtered = results[
+            results["code_department"].astype(str) == detected["department"]
+        ]
+    elif detected["region"]:
+        filtered = results[results["region"].str.lower() == detected["region"]]
+
+    fallback = filtered.empty
+    return (filtered.head(15) if not fallback else results.head(5)), fallback
+
+
 def generate_llm_response(prompt, tokenizer, model, max_new_tokens=200):
     inputs = tokenizer(prompt, return_tensors="pt", truncation=True).to(device)
-    with torch.no_grad(): # Disable gradient calculation thus reducing memory usage
+    with torch.no_grad():
         outputs = model.generate(
             **inputs,
             max_new_tokens=max_new_tokens,
             do_sample=True,
             pad_token_id=tokenizer.eos_token_id,
         )
-    full_response = tokenizer.decode(outputs[0], skip_special_tokens=True)
-
-    # Try to extract only the part after "Answer:"
-    if "Answer:" in full_response:
-        return full_response.split("Answer:", 1)[1].strip()
-    else:
-        return full_response.strip()
-
+    decoded = tokenizer.decode(outputs[0], skip_special_tokens=True)
+    return (
+        decoded.split("Answer:", 1)[-1].strip()
+        if "Answer:" in decoded
+        else decoded.strip()
+    )
 
 
-# ==== Streamlit UI ====
+# ========== Streamlit UI ==========
 st.set_page_config(page_title="⛽ Fuel Prices Chatbot", layout="wide")
 
-# 🚀 Load models and data at startup
 embed_model = load_embed_model()
 tokenizer, llm_model = load_llm_model()
 index, metadata_df = load_faiss_index_and_metadata()
+location_matchers = build_location_matchers(metadata_df)
 
-# UI title and layout
+# --- Header ---
 st.markdown(
     """
     <h1 style='text-align: center;'>⛽ France Fuel Prices Chatbot</h1>
@@ -150,38 +166,41 @@ st.markdown(
 """,
     unsafe_allow_html=True,
 )
-
 st.markdown("---")
 
-# Split layout: Input on left, illustration/help on right
+# --- User Input ---
 col1, col2 = st.columns([2, 1])
-
 with col1:
     user_query = st.text_input(
-        "💬 What do you want to know?", placeholder="e.g. Cheapest SP95 near Lyon"
+        "💬 What do you want to know?",
+        placeholder="e.g. what is the station with the cheapeast sp98 price in Marseille",
     )
     search_clicked = st.button("🔍 Search")
-
 with col2:
     st.image("https://img.icons8.com/color/96/gas-pump.png", width=96)
     st.caption("Powered by MiniLM + TinyLlama + FAISS")
 
-# Run search logic
+# --- Search + Response ---
 if search_clicked and user_query:
-        with st.spinner("🔎 Searching and generating response..."):
-            results = find_similar_stations(user_query, index, metadata_df, embed_model)
-            
-            # Assemble the context passed to the LLM
-            context = "\n".join(results["text"].tolist())
-            prompt = f"Given the following fuel stations data:\n{context}\n\nAnswer the user's question concisely: {user_query}\nAnswer:"
-            response = generate_llm_response(prompt, tokenizer, llm_model)
+    with st.spinner("🔎 Searching and generating response..."):
+        results, fallback = search_with_filter(
+            user_query, embed_model, metadata_df, index, location_matchers
+        )
+        latest_fetch_date = get_latest_fetch_date()
+        context = "\n".join(results["text"].tolist())
+        prompt = f"Given the following fuel stations data (fetched on {latest_fetch_date}):\n{context}\n\nAnswer the user's question concisely: {user_query}\nAnswer:"
+        response = generate_llm_response(prompt, tokenizer, llm_model)
 
-        st.success("✅ Done!")
+    st.success("✅ Done!")
 
-        # === Display only the generated response ===
-        st.markdown("### 🤖 Chatbot Response")
-        escaped_response = html.escape(response)
-        st.markdown(f"""
+    # Response block
+    st.markdown("### 🤖 Chatbot Response")
+    if fallback:
+        st.info(
+            "📌 No exact city/department/region match found — showing top semantic results."
+        )
+    st.markdown(
+        f"""
         <div style='
             padding: 12px;
             background-color: #f9f9f9;
@@ -189,17 +208,16 @@ if search_clicked and user_query:
             white-space: pre-wrap;
             font-family: monospace;
             color: #111;
-        '>
-        {escaped_response}
-        </div>
-        """, unsafe_allow_html=True)
+        '>{html.escape(response)}</div>
+    """,
+        unsafe_allow_html=True,
+    )
 
-        st.markdown("---")
+    st.markdown("---")
 
-        # === Show raw context string used in LLM prompt ===
-        st.markdown("### 📄 Context Given to the LLM")
-        st.code(context, language="text")
-
+    # Context shown to the LLM
+    st.markdown("### 📄 Context Given to the LLM")
+    st.write(f"Fetch Date: {latest_fetch_date}")
+    st.code(context, language="text")
 else:
-        st.warning("⚠️ Please enter a query to search.")
-
+    st.warning("⚠️ Please enter a query to search.")

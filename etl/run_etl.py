@@ -23,9 +23,9 @@ def run_etl():
     
     try:
         steps = [
-            ("Extracting data", extract_data),
-            ("Transforming data", lambda: transform_data(data_path)),
-            ("Initializing database", lambda: initialize_database(data_path)),
+            #("Extracting data", extract_data),
+            #("Transforming data", lambda: transform_data(data_path)),
+            #("Initializing database", lambda: initialize_database(data_path)),
             ("Loading data into database", lambda: load_latest_processed_data(data_path)),
             ("Update the FAISS embeddings for chatbot", generate_embeddings)
         ]
