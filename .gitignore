@@ -13,3 +13,6 @@ venv*
 models/
 notebooks/
 
+# Ignore all fille starting by __pycache
+__pyc*
+*/__pyc*
