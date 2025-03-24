@@ -5,7 +5,7 @@ A fully functional end-to-end chatbot and ETL pipeline for tracking and querying
 - ETL pipeline to collect, clean, and store data
 - Semantic search with embeddings (MiniLM + FAISS)
 - Retrieval-Augmented Generation (RAG) with a local LLM (TinyLlama)
-- Interactive chatbot frontend with Streamlit
+- Interactive chatbot frontend with **Streamlit** or **Chainlit**
 
 ---
 
@@ -13,8 +13,9 @@ A fully functional end-to-end chatbot and ETL pipeline for tracking and querying
 
 ```bash
 fuel-prices-fr-chatbot/
-├── app/                    # Streamlit chatbot UI
-│   └── chatbot.py
+├── app/                    # Chatbot UIs
+│   ├── chatbot.py          # Streamlit version
+│   └── chatbot_chainlit.py # Chainlit version
 ├── data/                  # Raw, processed, and indexed data
 │   ├── raw_data_YYYY-MM-DD.json
 │   ├── processed_data_YYYY-MM-DD.csv
@@ -113,7 +114,26 @@ Coordinates the full ETL and embedding workflow with logging.
 
 ## Chatbot: How It Works
 
-Located at `app/chatbot.py`, this Streamlit app runs an interactive chatbot powered by a local LLM and semantic search.
+Two frontends are supported:
+
+### 🧭 1. Streamlit UI — `app/chatbot.py`
+Interactive dashboard-style chatbot UI.
+
+Run with:
+```bash
+streamlit run app/chatbot.py
+```
+![Chatbot Screenshot](assets/app.png)
+
+### 💬 2. Chainlit UI — `app/chatbot_chainlit.py`
+Chat-native experience optimized for conversations.
+
+Run with:
+```bash
+chainlit run app/chatbot_chainlit.py
+```
+![Chatbot Screenshot](assets/app_with_chainlit.png)
+---
 
 ### End-to-End Flow:
 
@@ -139,48 +159,28 @@ prompt = f"Given the following station data:\n{context}\n\nQuestion: {query}\nAn
 response = generate_llm_response(prompt, tokenizer, model)
 ```
 
-6. **Answer Rendering in Streamlit**
+6. **Response Display**
 - Chatbot displays the LLM response
-- Shows supporting station data (for transparency)
+- Shows supporting station data (for expicability)
 
 ![Chatbot Screenshot](assets/chat_response.png)
 
 ---
 
-## Location Filtering with FlashText
-To improve relevance, the app uses `flashtext.KeywordProcessor` to extract location mentions from queries:
+## Run the Chatbots
 
-```python
-@st.cache_resource
-def build_location_matchers(df):
-    def init_matcher(col):
-        matcher = KeywordProcessor()
-        for item in df[col].dropna().unique():
-            matcher.add_keyword(str(item).lower())
-        return matcher
-
-    return (
-        init_matcher("city"),
-        init_matcher("code_department"),
-        init_matcher("region"),
-    )
-```
-
-> Detected locations are used to filter the FAISS search before querying the LLM.
-
----
-
-## Run the Chatbot
-
-Start the chatbot interface:
+### Streamlit
 ```bash
 streamlit run app/chatbot.py
 ```
 
-You can ask questions like:
-> "Where is the cheapest E10 in Marseille?"
+### Chainlit
+```bash
+chainlit run app/chatbot_chainlit.py
+```
 
-![Chatbot Screenshot](assets/app.png)
+Ask things like:
+> "Where is the cheapest SP95 in Lyon?"
 
 ---
 
@@ -231,7 +231,7 @@ This project provides a solid base for chatbot-driven exploration of structured 
 - Embedding-based semantic search
 - Local LLM answering with TinyLlama
 - Intelligent geo-filtering (city, department, region)
-- Interactive chatbot interface
+- Interactive chatbot interface (Streamlit or Chainlit)
 - Transparent and explainable responses
 
 ---
@@ -245,4 +245,3 @@ Feel free to open issues, contribute improvements, or suggest new features!
 ## License
 
 This project is licensed under the MIT License.
-

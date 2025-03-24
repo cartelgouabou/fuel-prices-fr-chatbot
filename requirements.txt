@@ -5,6 +5,7 @@ requests==2.32.3
 sentence_transformers==3.4.1
 faiss-cpu==1.10.0
 streamlit==1.43.2
+chainlit==2.4.301
 langchain-community==0.3.20
 transformers==4.50.0
 

@@ -5,7 +5,6 @@ import faiss
 import torch
 import html
 import streamlit as st
-import numpy as np
 from datetime import datetime
 from flashtext import KeywordProcessor
 from sentence_transformers import SentenceTransformer
@@ -188,7 +187,7 @@ if search_clicked and user_query:
         )
         latest_fetch_date = get_latest_fetch_date()
         context = "\n".join(results["text"].tolist())
-        prompt = f"Given the following fuel stations data (fetched on {latest_fetch_date}):\n{context}\n\nAnswer the user's question concisely: {user_query}\nAnswer:"
+        prompt = f"Given the following fuel stations data (fetched on {latest_fetch_date} and the prices in EUR):\n{context}\n\nAnswer the user's question concisely: {user_query}\nAnswer:"
         response = generate_llm_response(prompt, tokenizer, llm_model)
 
     st.success("✅ Done!")
