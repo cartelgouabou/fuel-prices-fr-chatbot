@@ -61,15 +61,142 @@ $ source venv-fuel/bin/activate  # On Windows: venv-fuel\Scripts\activate
 (venv-fuel) $ ./download_model.sh
 ```
 
-### 4. Run the ETL pipeline
+## ⚙️ ETL Pipeline Overview
+
+The ETL pipeline extracts and transforms fuel data, loads it into a local database, and prepares it for semantic retrieval with embeddings.
+
 ```bash
-(venv-fuel) $ python -m etl.run_etl
+python -m etl.run_etl
 ```
-This performs:
-- Extract: Pulls data from `data.gouv.fr` (up to 10k+ records)
-- Transform: Cleans and formats into CSV
-- Load: Stores into SQLite + FAISS
-- Embeds: Generates vector embeddings for chatbot retrieval
+
+This runs the following scripts:
+
+### 1. `fetch_data.py` — **Extract**
+Pulls paginated JSON data via the public API:
+```text
+https://tabular-api.data.gouv.fr/api/resources/...
+```
+Stores to:
+```
+data/raw_data_YYYY-MM-DD.json
+```
+
+![API Screenshot](assets/api_illustration.png)
+
+### 2. `transform_data.py` — **Transform**
+- Cleans up null values, formats fuel types, location, timestamps
+- Saves structured CSV to:
+```
+data/processed_data_YYYY-MM-DD.csv
+```
+
+### 3. `load_data.py` — **Load**
+- Initializes the SQLite DB (`fuel_prices.db`)
+- Inserts transformed rows into a relational schema
+
+### 4. `process_fuel_embeddings.py` — **Embed** ✅ **(Key RAG Step)**
+
+This script is critical to enabling RAG (Retrieval-Augmented Generation). It does:
+
+- **Query Latest Data**: Uses SQL with `MAX(updated_at)` to get the latest fuel prices for each station.
+
+- **Format Text for Embedding**:
+```text
+Station 12345 in 1 Rue ABC, Paris, 75, Ile-de-France:
+Gazole=1.85, SP95=1.79, ...
+```
+
+- **Embed with MiniLM**:
+```python
+embed_model = SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2")
+embeddings = embed_model.encode(df["text"].tolist(), convert_to_numpy=True)
+```
+
+- **Index with FAISS**:
+```python
+index = faiss.IndexFlatL2(embeddings.shape[1])
+index.add(embeddings)
+```
+
+- **Save**:
+  - `data/faiss_index`
+  - `data/embeddings.pkl` (contains original metadata)
+
+> This step connects raw structured data with semantic retrieval by enabling fast similarity search over station descriptions.
+
+### 5. `run_etl.py` — **Pipeline Orchestrator**
+Handles all steps in order with logging and error handling.
+
+---
+
+
+## 🤖 Chatbot Flow (app/chatbot.py)
+
+### Step-by-Step RAG Pipeline
+
+1. **User Input**
+   > e.g. "Cheapest SP95 near Lyon"
+
+2. **Semantic Search (FAISS)**
+```python
+results = find_similar_stations(user_query, index, metadata_df, embed_model)
+```
+Returns top-5 results from vector index with metadata.
+
+3. **Prompt Building**
+Combines user query and retrieved context into a single input for the LLM:
+```python
+prompt = f"Given the following fuel stations data:\n{context}\n\nAnswer the user's question: {user_query}\nAnswer:"
+```
+
+4. **LLM Generation with TinyLlama**
+```python
+response = generate_llm_response(prompt, tokenizer, model)
+```
+Uses local `TinyLlama-1.1B-Chat-v1.0` in FP16 (if GPU is available).
+
+5. **Display Answer and Supporting Context**
+- Final answer is shown in a styled output box
+- Context is printed below to ensure transparency
+
+![Chatbot Screenshot](assets/response.png)
+
+---
+
+### 🔍 Enhancing Context Filtering with FlashText
+
+To improve location-aware filtering in responses, the chatbot includes logic using `flashtext.KeywordProcessor` to detect **city**, **department**, or **region** keywords in user queries.
+
+```python
+@st.cache_resource
+def build_location_matchers(metadata_df):
+    def init_matcher(column):
+        matcher = KeywordProcessor()
+        for item in metadata_df[column].dropna().unique():
+            matcher.add_keyword(str(item).lower())
+        return matcher
+
+    return (
+        init_matcher("city"),
+        init_matcher("code_department"),
+        init_matcher("region"),
+    )
+```
+
+- **detect_location()**: Identifies the most likely matching location from the query.
+- **search_with_filter()**: Applies a priority filter based on detected locations, improving relevance in FAISS matches without re-embedding.
+- This enhances semantic retrieval by combining vector similarity with keyword-based filtering.
+
+---
+## 🌐 Run the Chatbot Interface
+![Chatbot Screenshot](assets/app.png)
+
+```bash
+streamlit run app/chatbot.py
+```
+
+You can ask:
+> "Where is the cheapest E10 in Marseille?"
 
 ---
 
@@ -108,106 +235,3 @@ Add arguments:
 Ensure that the task is allowed to run with the correct user permissions.
 
 ---
-
-## 🧑‍💬 Run the Chatbot Interface
-
-```bash
-(venv-fuel) $ streamlit run app/chatbot.py
-```
-
-- Query in natural language: `Cheapest SP95 near Marseille`
-- The app performs semantic search over vector DB and passes top-k context to TinyLlama
-- You get smart responses with supporting data shown
-
----
-
-## ✈️ ETL Pipeline - Step-by-Step
-
-### 1. `fetch_data.py`
-Fetches paginated API data from [data.gouv.fr](https://data.gouv.fr) using:
-```python
-BASE_URL = "https://tabular-api.data.gouv.fr/api/resources/..."
-```
-Saves results to:
-```
-data/raw_data_YYYY-MM-DD.json
-```
-
-### 2. `transform_data.py`
-- Parses raw JSON
-- Extracts and cleans fields (fuel types, location, timestamp)
-- Saves to:
-```
-data/processed_data_YYYY-MM-DD.csv
-```
-
-### 3. `load_data.py`
-- Initializes SQLite database (`fuel_prices.db`)
-- Inserts new records
-
-### 4. `process_fuel_embeddings.py`
-- Loads latest fuel records from DB
-- Formats text for embedding:
-  ```text
-  Station 12345 in 1 Rue ABC, Paris, 75, Ile-de-France:
-  Gazole=1.85, SP95=1.79, ...
-  ```
-- Encodes text with `MiniLM-L6-v2`
-- Indexes into FAISS and saves metadata:
-```
-data/faiss_index
-and
-data/embeddings.pkl
-```
-
-### 5. `run_etl.py`
-One-click pipeline to execute all the above steps in order.
-
----
-
-## 🤖 Chatbot Flow (app/chatbot.py)
-
-- Load resources at startup: embeddings, FAISS index, LLM, tokenizer
-- User enters natural language query
-- Semantic search retrieves top-5 similar entries from FAISS
-- LLM receives structured context and generates a response
-
-```python
-prompt = f"Given the following fuel stations data:\n{context}\n\nAnswer the user's question: {user_query}\nAnswer:"
-```
-
-LLM outputs a concise answer which is shown alongside the search context.
-
----
-
-## ⚡ Models Used
-
-| Purpose             | Model                              |
-|--------------------|-------------------------------------|
-| Embedding          | `sentence-transformers/all-MiniLM-L6-v2` |
-| Local Language Model | `TinyLlama-1.1B-Chat-v1.0`             |
-| Vector DB          | FAISS                             |
-
----
-
-## 🔧 Utilities
-
-- `utils.py`: Helps find the latest processed file by filename timestamp
-
----
-
-## 🚀 Future Enhancements
-
-- Improve LLM answers with more reasoning
-- Add support for map-based search
-- Enable GPU acceleration if available
-- Add unit tests
-
----
-
-## 🚫 Disclaimer
-
-This project is for educational/demo purposes. Data is fetched from a public API and may not be real-time.
-
----
-
