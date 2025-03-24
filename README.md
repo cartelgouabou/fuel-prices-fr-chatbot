@@ -216,6 +216,23 @@ Add arguments: C:\path\to\fuel-prices-fr-chatbot\etl\run_etl.py
 
 ---
 
+## Future Improvements
+
+This project provides a solid base for chatbot-driven exploration of structured data. Here are ideas for improving or extending its capabilities:
+
+- Improve prompt templates to guide the LLM for more accurate, structured answers
+- Add fuel price graphing and geolocation-based mapping to enhance visualization
+- Replace TinyLlama with a more powerful or multilingual model
+- Introduce GPU inference support for faster LLM generation
+- Add support for map-based search using coordinates or bounding boxes
+- Add unit tests and enable CI coverage to ensure pipeline reliability
+- Improve LLM reasoning and response formatting
+- Build a user feedback interface to gather response quality insights
+- Enable PostgreSQL or cloud-based database connectivity
+- Adapt the pipeline and chatbot to other domains (legal, healthcare, real estate, etc.)
+
+---
+
 ## Features Summary
 
 - Auto-refreshing fuel data pipeline
