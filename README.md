@@ -147,14 +147,6 @@ response = generate_llm_response(prompt, tokenizer, model)
 
 ---
 
-## Example Queries
-
-- "Where is SP95 the cheapest in Lyon?"
-- "Best diesel price near Bordeaux?"
-- "Price of E85 in department 75"
-
----
-
 ## Location Filtering with FlashText
 To improve relevance, the app uses `flashtext.KeywordProcessor` to extract location mentions from queries:
 
