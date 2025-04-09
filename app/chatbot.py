@@ -4,7 +4,9 @@ import pickle
 import faiss
 import torch
 import html
+import json
 import streamlit as st
+import requests  
 from datetime import datetime
 from flashtext import KeywordProcessor
 from sentence_transformers import SentenceTransformer
@@ -132,21 +134,49 @@ def search_with_filter(query, embed_model, metadata_df, faiss_index, matchers):
     return (filtered.head(15) if not fallback else results.head(5)), fallback
 
 
-def generate_llm_response(prompt, tokenizer, model, max_new_tokens=200):
-    inputs = tokenizer(prompt, return_tensors="pt", truncation=True).to(device)
-    with torch.no_grad():
-        outputs = model.generate(
-            **inputs,
-            max_new_tokens=max_new_tokens,
-            do_sample=True,
-            pad_token_id=tokenizer.eos_token_id,
+def generate_llm_response(prompt, tokenizer=None, model=None, backend="TinyLlama (local)", max_new_tokens=200):
+    if backend == "TinyLlama (local)":
+        inputs = tokenizer(prompt, return_tensors="pt", truncation=True).to(device)
+        with torch.no_grad():
+            outputs = model.generate(
+                **inputs,
+                max_new_tokens=max_new_tokens,
+                do_sample=True,
+                pad_token_id=tokenizer.eos_token_id,
+            )
+        decoded = tokenizer.decode(outputs[0], skip_special_tokens=True)
+        return (
+            decoded.split("Answer:", 1)[-1].strip()
+            if "Answer:" in decoded
+            else decoded.strip()
         )
-    decoded = tokenizer.decode(outputs[0], skip_special_tokens=True)
-    return (
-        decoded.split("Answer:", 1)[-1].strip()
-        if "Answer:" in decoded
-        else decoded.strip()
-    )
+
+    elif backend == "Ollama (Mistral)":
+        try:
+            response = requests.post(
+                "http://localhost:11434/api/generate",
+                json={
+                    "model": "mistral",
+                    "prompt": prompt,
+                    "options": {"temperature": 0.7, "num_predict": max_new_tokens}
+                },
+                stream=True  # <--- IMPORTANT: Enable streaming
+            )
+            response.raise_for_status()
+
+            # Accumulate streamed chunks
+            full_response = ""
+            for line in response.iter_lines():
+                if line:
+                    chunk = line.decode("utf-8")
+                    data = json.loads(chunk)
+                    full_response += data.get("response", "")
+
+            return full_response.strip()
+
+        except Exception as e:
+            return f"Error from Ollama: {str(e)}"
+
 
 
 # ========== Streamlit UI ==========
@@ -170,17 +200,41 @@ st.markdown("---")
 # --- User Input ---
 col1, col2 = st.columns([2, 1])
 with col1:
+    # Add LLM selection dropdown
+    model_choice = st.selectbox(
+        "🧠 Choose LLM Backend",
+        ["TinyLlama (local)", "Ollama (Mistral)"],
+        index=0
+    )
+
     user_query = st.text_input(
         "💬 What do you want to know?",
-        placeholder="e.g. what is the station with the cheapeast sp98 price in Marseille",
+        placeholder="e.g. what is the station with the cheapest sp98 price in Marseille",
     )
     search_clicked = st.button("🔍 Search")
 with col2:
     st.image("https://img.icons8.com/color/96/gas-pump.png", width=96)
-    st.caption("Powered by MiniLM + TinyLlama + FAISS")
+    st.caption("Powered by MiniLM + FAISS + " + ("TinyLlama" if model_choice == "TinyLlama (local)" else "Mistral via Ollama"))
+
+# --- Wrap TinyLlama loading based on selection ---
+if model_choice == "TinyLlama (local)":
+    tokenizer, llm_model = load_llm_model()
+else:
+    tokenizer, llm_model = None, None  # Ollama doesn't need local models
 
 # --- Search + Response ---
 if search_clicked and user_query:
+    # Check if Ollama is running if selected
+    if model_choice == "Ollama (Mistral)":
+        try:
+            r = requests.get("http://localhost:11434")
+            if not r.ok:
+                st.error("⚠️ Ollama server responded with an error. Please check that it's running.")
+                st.stop()
+        except requests.exceptions.ConnectionError:
+            st.error("❌ Ollama server is not running on http://localhost:11434.\n\nRun it using `ollama run mistral`.")
+            st.stop()
+
     with st.spinner("🔎 Searching and generating response..."):
         results, fallback = search_with_filter(
             user_query, embed_model, metadata_df, index, location_matchers
@@ -188,7 +242,8 @@ if search_clicked and user_query:
         latest_fetch_date = get_latest_fetch_date()
         context = "\n".join(results["text"].tolist())
         prompt = f"Given the following fuel stations data (fetched on {latest_fetch_date} and the prices in EUR):\n{context}\n\nAnswer the user's question concisely: {user_query}\nAnswer:"
-        response = generate_llm_response(prompt, tokenizer, llm_model)
+        response = generate_llm_response(prompt, tokenizer, llm_model, backend=model_choice)
+
 
     st.success("✅ Done!")
 

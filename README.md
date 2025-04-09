@@ -9,6 +9,29 @@ A fully functional end-to-end chatbot and ETL pipeline for tracking and querying
 
 ---
 
+## Update Notice: Version 2 Now Includes Mistral via Ollama
+
+The chatbot now supports **Mistral** via [Ollama](https://ollama.com), allowing you to use a more powerful local LLM alongside TinyLlama.
+
+### What's New:
+- Option to choose **TinyLlama (local)** or **Mistral (Ollama)** in the chatbot UI
+- Ollama streaming support with chunked response handling
+- Automatic check to ensure the Ollama server is running
+
+### How to Enable Mistral via Ollama:
+1. [Install Ollama](https://ollama.com/download)
+2. Run the model locally:
+```bash
+ollama run mistral
+```
+3. In the chatbot, select **"Ollama (Mistral)"** from the dropdown before submitting your query.
+
+> Ollama must be running on `http://localhost:11434` for the chatbot to work with Mistral.
+![V2](assets/ollama.png)
+---
+
+
+
 ## Project Structure
 
 ```bash
@@ -218,11 +241,6 @@ This project provides a solid base for chatbot-driven exploration of structured 
 - Introduce GPU inference support for faster LLM generation
 - Add support for map-based search using coordinates or bounding boxes
 - Add unit tests and enable CI coverage to ensure pipeline reliability
-- Improve LLM reasoning and response formatting
-- Build a user feedback interface to gather response quality insights
-- Enable PostgreSQL or cloud-based database connectivity
-- Adapt the pipeline and chatbot to other domains (legal, healthcare, real estate, etc.)
-
 ---
 
 ## Features Summary
@@ -239,9 +257,3 @@ This project provides a solid base for chatbot-driven exploration of structured 
 ## Contributions & Feedback
 
 Feel free to open issues, contribute improvements, or suggest new features!
-
----
-
-## License
-
-This project is licensed under the MIT License.
