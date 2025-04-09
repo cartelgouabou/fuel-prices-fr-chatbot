@@ -9,7 +9,7 @@ A fully functional end-to-end chatbot and ETL pipeline for tracking and querying
 
 ---
 
-## ✨ Update Notice: Version 2 Now Includes Mistral via Ollama
+## ✨ Update Notice 10/04/2025: Version 2 Now Includes Mistral via Ollama
 
 The chatbot now supports **Mistral** via [Ollama](https://ollama.com), allowing you to use a more powerful local LLM alongside TinyLlama.
 
