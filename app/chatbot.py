@@ -107,7 +107,7 @@ def search_with_filter(query: str, embed_model, metadata_df, faiss_index, matche
     fallback = filtered.empty
     return (filtered.head(15) if not fallback else results.head(5)), fallback
 
-def generate_llm_response(prompt: str, backend="Ollama (Mistral)", max_new_tokens=500) -> str:
+def generate_llm_response(prompt: str, backend="Ollama (Mistral)", max_new_tokens=500, temperature=0.7) -> str:
     model_map = {
         "Ollama (Mistral)": "mistral",
         "Ollama (Gemma)": "gemma",
@@ -121,7 +121,7 @@ def generate_llm_response(prompt: str, backend="Ollama (Mistral)", max_new_token
             json={
                 "model": model,
                 "prompt": prompt,
-                "options": {"temperature": 0.7, "num_predict": max_new_tokens},
+                "options": {"temperature": temperature, "num_predict": max_new_tokens},
             },
             stream=True,
         )
@@ -138,7 +138,7 @@ def generate_llm_response(prompt: str, backend="Ollama (Mistral)", max_new_token
         logging.error(f"Ollama generation error: {e}")
         return f"❌ Error generating response from {model}: {str(e)}"
 
-def enhance_query_with_llm(user_query: str, backend="Ollama (Mistral)", max_new_tokens=100) -> str:
+def enhance_query_with_llm(user_query: str, backend="Ollama (Mistral)", max_new_tokens=100, temperature=0.7) -> str:
     enhancement_prompt = f"""
 You are enhancing a search query for retrieving fuel station data in France. The data follows this structure:
 
@@ -154,7 +154,7 @@ Given the user query: "{user_query}"
 
 Return only the enhanced query:
 """
-    return generate_llm_response(enhancement_prompt, backend=backend, max_new_tokens=max_new_tokens)
+    return generate_llm_response(enhancement_prompt, backend=backend, max_new_tokens=max_new_tokens, temperature=temperature)
 
 # ========== Streamlit UI ==========
 st.set_page_config(page_title="⛽ Fuel Prices Chatbot", layout="wide")
@@ -196,7 +196,7 @@ if search_clicked and user_query:
             f"{context}\n\nOriginal question: {user_query}\nEnhanced query: {enhanced_query}\n"
             f"Provide a clear and concise answer based on the enhanced query."
         )
-        response = generate_llm_response(prompt, backend=model_choice)
+        response = generate_llm_response(prompt, backend=model_choice, temperature=0.4)
 
     st.success("✅ Done!")
 
