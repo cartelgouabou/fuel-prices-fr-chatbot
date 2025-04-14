@@ -107,7 +107,7 @@ def search_with_filter(query: str, embed_model, metadata_df, faiss_index, matche
     fallback = filtered.empty
     return (filtered.head(15) if not fallback else results.head(5)), fallback
 
-def generate_llm_response(prompt: str, backend="Ollama (Mistral)", max_new_tokens=200) -> str:
+def generate_llm_response(prompt: str, backend="Ollama (Mistral)", max_new_tokens=500) -> str:
     model_map = {
         "Ollama (Mistral)": "mistral",
         "Ollama (Gemma)": "gemma",
@@ -140,20 +140,20 @@ def generate_llm_response(prompt: str, backend="Ollama (Mistral)", max_new_token
 
 def enhance_query_with_llm(user_query: str, backend="Ollama (Mistral)", max_new_tokens=100) -> str:
     enhancement_prompt = f"""
-You are optimizing a search query to retrieve fuel station data in France. The data is structured like this:
+You are enhancing a search query for retrieving fuel station data in France. The data follows this structure:
 
 📍 CITY station id 12345 located at ADDRESS, DEPT_CODE, REGION./ 
 Prices: Gazole=..., SP98=..., SP95=..., E10=..., E85=..., GPLC=...
 
-Based on the following user query: **\"{user_query}\"**
+Given the user query: "{user_query}"
 
-- Detect and insert any known or implied fuel types
-- Clarify vague terms like \"cheapest\" or \"best\" with measurable intent (e.g., \"lowest price\")
-- Insert any detected or inferred location like city, department, or region
-- Output only the query in a structured way to match the context format above
+- Detect and include relevant fuel types
+- Clarify vague words like "cheapest" with measurable terms like "lowest price"
+- Add any explicit or implied location info (e.g., city, department, region)
+- Output only the enhanced query in plain text — no labels, no explanations, no formatting
 
-Enhanced query:"""
-
+Return only the enhanced query:
+"""
     return generate_llm_response(enhancement_prompt, backend=backend, max_new_tokens=max_new_tokens)
 
 # ========== Streamlit UI ==========

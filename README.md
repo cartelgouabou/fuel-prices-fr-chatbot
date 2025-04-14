@@ -104,7 +104,6 @@ The chatbot now supports **Mistral** via [Ollama](https://ollama.com), allowing 
 ```bash
 ollama run mistral
 ```
-3. In the chatbot, select **"Ollama (Mistral)"** from the dropdown before submitting your query.
 
 > Ollama must be running on `http://localhost:11434` for the chatbot to work with Mistral.
 
@@ -130,7 +129,7 @@ ollama run mistral
 
 #### a. Start the full stack
 ```bash
-docker-compose up --build
+docker compose up --build
 ```
 
 #### b. Open the interfaces
