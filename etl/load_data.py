@@ -7,14 +7,6 @@ from utilities.utils import get_latest_processed_file
 # Configure logging
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
-# Automatically define data_path as '../data'
-data_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '../data'))
-
-# Check if data directory exists, if not log a message and exit
-if not os.path.exists(data_path):
-    logging.error("Data directory not found. Please run fetch_data.py first.")
-    exit(1)
-
 def initialize_database(data_path):
     """
     Create the SQLite database and ensure the fuel_prices table exists.
@@ -138,6 +130,9 @@ def load_latest_processed_data(data_path):
         conn.close()
         logging.info(f"Inserted {len(df_new)} new or updated records into the database.")
 
-if __name__ == "__main__":
+def run_load_data(data_path):
+    """
+    Run the load data process.
+    """ 
     initialize_database(data_path)
     load_latest_processed_data(data_path)

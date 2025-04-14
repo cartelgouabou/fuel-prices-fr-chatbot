@@ -88,5 +88,4 @@ def extract_data():
     else:
         logging.warning("No data extracted.")
 
-if __name__ == "__main__":
-    extract_data()
+

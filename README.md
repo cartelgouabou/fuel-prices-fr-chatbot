@@ -1,36 +1,52 @@
 # Fuel Prices France Chatbot
 
-A fully functional end-to-end chatbot and ETL pipeline for tracking and querying fuel prices across France. This project leverages:
+A conversational AI assistant that helps users discover the latest **fuel prices** across France. The chatbot leverages real-time government data, processes it using an ETL pipeline, and allows natural language querying through a Streamlit or Chainlit-powered interface — enhanced with semantic search using FAISS and MiniLM embeddings.
 
-- ETL pipeline to collect, clean, and store data
-- Semantic search with embeddings (MiniLM + FAISS)
-- Retrieval-Augmented Generation (RAG) with a local LLM (TinyLlama)
-- Interactive chatbot frontend with **Streamlit** or **Chainlit**
+## Table of Contents
+
+- [Project Overview](#project-overview)
+- [Features](#features)
+- [Project Structure](#project-structure)
+- [How to Run (Docker or Manual)](#how-to-run-docker-or-manual)
+  - [1️⃣ Clone the Repo](#1-clone-the-repo)
+  - [2️⃣ Option A: Run with Docker Compose](#2-option-a-run-with-docker-compose)
+  - [3️⃣ Option B: Run Locally without Docker](#3-option-b-run-locally-without-docker)
+- [ETL Pipeline](#etl-pipeline-extract-transform-load--embeddings)
+- [Chatbot Interface](#chatbot-interface)
+- [Example Flow](#example-flow)
+- [Automate Daily ETL](#automate-daily-etl)
+- [Docker Notes](#docker-notes-if-running-chatbot-inside-a-container)
+- [Read the Full Medium Article](#read-the-full-medium-article)
+- [Future Improvements](#future-improvements)
+- [Features Summary](#features-summary)
+- [Contributions & Feedback](#contributions--feedback)
 
 ---
 
-## ✨ Update Notice 10/04/2025: Version 2 Now Includes Mistral via Ollama
+## Project Overview
+Fuel prices in France change regularly and vary widely across regions. This chatbot makes it easier to:
 
-The chatbot now supports **Mistral** via [Ollama](https://ollama.com), allowing you to use a more powerful local LLM alongside TinyLlama.
+- Fetch **latest fuel price data** from the French government API.
+- Process and embed the data using **sentence-transformers** and **FAISS**.
+- Search semantically across stations using natural language.
+- Respond intelligently using **LLM inference with Ollama** (Mistral/Gemma).
+- Interact via **Streamlit UI** or **Chainlit chat interface**.
 
-### What's New:
-- Option to choose **TinyLlama (local)** or **Mistral (Ollama)** in the chatbot UI
-- Ollama streaming support with chunked response handling
-- Automatic check to ensure the Ollama server is running
+> Think of it as ChatGPT for fuel prices — localized to France.
 
-### How to Enable Mistral via Ollama:
-1. [Install Ollama](https://ollama.com/download)
-2. Run the model locally:
-```bash
-ollama run mistral
-```
-3. In the chatbot, select **"Ollama (Mistral)"** from the dropdown before submitting your query.
-
-> Ollama must be running on `http://localhost:11434` for the chatbot to work with Mistral.
-![V2](assets/ollama.png)
 ---
 
+## Features
 
+- Real-time fuel data from [data.gouv.fr](https://www.data.gouv.fr)
+- Full ETL pipeline: Extract, Transform, Load
+- Embedding-based semantic search with MiniLM + FAISS
+- Local LLM inference with Mistral/Gemma via Ollama
+- Natural language querying via Streamlit and Chainlit interfaces
+- Location-aware search: city, department, region
+- Easy deployment with Docker Compose
+
+---
 
 ## Project Structure
 
@@ -51,159 +67,161 @@ fuel-prices-fr-chatbot/
 │   ├── load_data.py
 │   ├── process_fuel_embeddings.py
 │   └── run_etl.py
-├── models/                # Local LLM model directory
-│   └── tinyllama/
 ├── utilities/             # Utility scripts
 │   └── utils.py
-├── download_model.sh      # TinyLlama download script
 ├── requirements.txt       # Python dependencies
+├── Dockerfile
+├── docker-compose.yml
 ├── fuel_data_processing.log
-├── README.md
-└── tests/                 # Optional unit tests
+├── assets/                # Illustrations
+│   ├── api_illustration.png
+│   ├── ollama.png
+│   ├── app.png
+│   ├── chain-stream_illustration.png
+│   └── response_context.png
+└── README.md
 ```
+
+---
+
+## Prerequisite
+
+The chatbot now supports **Mistral** via [Ollama](https://ollama.com), allowing you to use a more powerful local LLM for response generation.
+
+### Required Software
+- [Ollama](https://ollama.com/download)
+- [Docker](https://www.docker.com/) (for Dockerized deployment)
+- Python 3.10+
+
+### What's New:
+- Option to choose **Gemma** or **Mistral** via Ollama
+- Ollama streaming support with chunked response handling
+- Automatic check to ensure the Ollama server is running
+
+### How to Enable Mistral via Ollama:
+1. [Install Ollama](https://ollama.com/download)
+2. Run the model locally:
+```bash
+ollama run mistral
+```
+3. In the chatbot, select **"Ollama (Mistral)"** from the dropdown before submitting your query.
+
+> Ollama must be running on `http://localhost:11434` for the chatbot to work with Mistral.
+
+![Ollama Setup](assets/ollama.png)
 
 ---
 
 ## Setup Instructions
 
-### 1. Clone the Repository
+### 1. Clone the Repository and run ollama
+
+#### a. Clone the Repository
 ```bash
 git clone https://github.com/cartelgouabou/fuel-prices-fr-chatbot.git
 cd fuel-prices-fr-chatbot
 ```
+#### b. Run Ollama locally
+```bash
+ollama run mistral
+```
 
-### 2. Create & Activate Virtual Environment
+### 2. Option A: Run with Docker Compose (Recommended)
+
+#### a. Start the full stack
+```bash
+docker-compose up --build
+```
+
+#### b. Open the interfaces
+- Streamlit UI: http://localhost:8501
+- Chainlit UI: http://localhost:8000
+
+### 3. Option B: Manual Setup (No Docker)
+
+#### a. Create & activate virtual environment
 ```bash
 python -m venv venv-fuel
 source venv-fuel/bin/activate  # Windows: venv-fuel\Scripts\activate
 ```
 
-### 3. Install Python Dependencies
+#### b. Install dependencies
 ```bash
 pip install -r requirements.txt
 ```
 
-### 4. Download the TinyLlama Model
+#### c. Run the ETL pipeline
 ```bash
-chmod +x download_model.sh
-./download_model.sh
+python etl/run_etl.py
+```
+
+#### d. Launch chatbot UI
+```bash
+streamlit run app/chatbot.py
+# or
+chainlit run app/chatbot_chainlit.py --host 0.0.0.0 --port 8000
 ```
 
 ---
 
 ## ETL Pipeline: Extract, Transform, Load + Embeddings
 
-Run the entire pipeline with:
+Run everything with:
 ```bash
-python -m etl.run_etl
+python etl/run_etl.py
 ```
-This runs all ETL steps:
 
-### 1. `fetch_data.py` — Extract
-- Fetches paginated JSON fuel station data from [data.gouv.fr](https://www.data.gouv.fr)
-- Saves to `data/raw_data_YYYY-MM-DD.json`
+### 1. `fetch_data.py`
+- Calls French API
+- Downloads fuel station data
+- Saves JSON
 
 ![API Screenshot](assets/api_illustration.png)
 
-### 2. `transform_data.py` — Transform
-- Cleans, filters, and normalizes fuel types, location info, and timestamps
-- Saves to `data/processed_data_YYYY-MM-DD.csv`
+### 2. `transform_data.py`
+- Cleans and normalizes fields
+- Outputs CSV
 
-### 3. `load_data.py` — Load
-- Loads the processed CSV into SQLite (`fuel_prices.db`)
-- Structured schema: stations, fuels, prices, timestamps
+### 3. `load_data.py`
+- Creates/updates SQLite database
+- Adds only new or modified stations
 
-### 4. `process_fuel_embeddings.py` — Generate Embeddings
-This key RAG step enables semantic search over fuel station data.
+### 4. `process_fuel_embeddings.py`
+- Generates descriptive text per station
+- Embeds with MiniLM
+- Stores FAISS index + metadata
 
-- Queries latest prices using SQL:
-```sql
-SELECT * FROM fuel_prices WHERE updated_at = (SELECT MAX(updated_at) FROM fuel_prices)
-```
-- Formats station data into descriptive text for embedding
-- Uses MiniLM from `sentence-transformers`:
-```python
-SentenceTransformer("all-MiniLM-L6-v2")
-```
-- Indexes vectors with FAISS for efficient search
-- Outputs:
-  - `data/faiss_index`
-  - `data/embeddings.pkl` (with original metadata)
-
-### 5. `run_etl.py` — Pipeline Orchestrator
-Coordinates the full ETL and embedding workflow with logging.
+### 5. `run_etl.py`
+- Orchestrates the entire ETL + embedding process
 
 ---
 
-## Chatbot: How It Works
+## Chatbot Interface
 
-Two frontends are supported:
-
-### 🧭 1. Streamlit UI — `app/chatbot.py`
-Interactive dashboard-style chatbot UI.
-
-Run with:
+###  Streamlit UI
 ```bash
 streamlit run app/chatbot.py
 ```
-![Chatbot Screenshot](assets/app.png)
+![Streamlit](assets/app.png)
 
-### 💬 2. Chainlit UI — `app/chatbot_chainlit.py`
-Chat-native experience optimized for conversations.
-
-Run with:
+###  Chainlit UI
 ```bash
-chainlit run app/chatbot_chainlit.py
+chainlit run app/chatbot_chainlit.py --host 0.0.0.0 --port 8000
 ```
-![Chatbot Screenshot](assets/app_with_chainlit.png)
----
-
-### End-to-End Flow:
-
-1. **User enters a query**
-   > e.g. "Cheapest E10 near Marseille"
-
-2. **Keyword Matching (Location)**
-   - Uses `flashtext` to detect regions, departments, or cities
-
-3. **Filtered Semantic Search (FAISS)**
-```python
-results = find_similar_stations(query, index, metadata_df, embed_model)
-```
-
-4. **Prompt Construction**
-Combines retrieved station info + user question:
-```python
-prompt = f"Given the following station data:\n{context}\n\nQuestion: {query}\nAnswer:"
-```
-
-5. **Local LLM Generation (TinyLlama)**
-```python
-response = generate_llm_response(prompt, tokenizer, model)
-```
-
-6. **Response Display**
-- Chatbot displays the LLM response
-- Shows supporting station data (for expicability)
-
-![Chatbot Screenshot](assets/chat_response.png)
+![Chainlit](assets/chainlit_illustration.png)
 
 ---
 
-## Run the Chatbots
+## Example Flow
 
-### Streamlit
-```bash
-streamlit run app/chatbot.py
-```
+1. User query: _"Cheapest E10 in Lyon?"_
+2. Keyword location detection: Lyon
+3. Semantic FAISS search with embedding similarity
+4. Prompt constructed: Context + question
+5. Response generated via Mistral through Ollama
+6. LLM output + context shown
 
-### Chainlit
-```bash
-chainlit run app/chatbot_chainlit.py
-```
-
-Ask things like:
-> "Where is the cheapest SP95 in Lyon?"
+![Response Example](assets/response_context.png)
 
 ---
 
@@ -231,23 +249,65 @@ Add arguments: C:\path\to\fuel-prices-fr-chatbot\etl\run_etl.py
 
 ---
 
+## Docker Notes (if running chatbot inside a container)
+
+If you plan to run the chatbot (Chainlit or Streamlit) inside a Docker container, and your **Ollama server is running on the host**, you must adapt the API URL:
+
+### 🔧 Modify API Endpoint in Code
+Replace all occurrences of:
+```python
+"http://localhost:11434/api/generate"
+```
+With:
+```python
+"http://host.docker.internal:11434/api/generate"  # For Docker
+```
+This ensures the container can reach the Ollama server running on the host.
+
+### 📍 Example Update (in `app/chatbot_chainlit.py` or `app/chatbot.py`)
+```python
+# requests.get("http://localhost:11434", timeout=2)
+requests.get("http://host.docker.internal:11434", timeout=2)  # For Docker
+```
+
+And for generation:
+```python
+# "http://localhost:11434/api/generate"
+"http://host.docker.internal:11434/api/generate"  # For Docker
+```
+
+Make sure to restart the container after modifying the code.
+
+---
+
+## 🔖 Read the Full Medium Article
+
+Curious about how this all works step by step? Check out the complete guide:
+
+👉 **[Créez un chatbot intelligent avec RAG – Le guide complet étape par étape](https://medium.com/@cartelgouabou/cr%C3%A9ez-un-chatbot-intelligent-avec-rag-le-guide-complet-%C3%A9tape-par-%C3%A9tape-ebd787513e47)**
+
+It walks through the concepts, design, and implementation strategies in an accessible and practical way.
+
+---
+
 ## Future Improvements
 
 This project provides a solid base for chatbot-driven exploration of structured data. Here are ideas for improving or extending its capabilities:
 
 - Improve prompt templates to guide the LLM for more accurate, structured answers
 - Add fuel price graphing and geolocation-based mapping to enhance visualization
-- Replace TinyLlama with a more powerful or multilingual model
+- Replace MiniLM with a more powerful or multilingual model
 - Introduce GPU inference support for faster LLM generation
 - Add support for map-based search using coordinates or bounding boxes
 - Add unit tests and enable CI coverage to ensure pipeline reliability
+
 ---
 
 ## Features Summary
 
 - Auto-refreshing fuel data pipeline
 - Embedding-based semantic search
-- Local LLM answering with TinyLlama
+- Local LLM answering with Mistral or Gemma
 - Intelligent geo-filtering (city, department, region)
 - Interactive chatbot interface (Streamlit or Chainlit)
 - Transparent and explainable responses
@@ -255,5 +315,5 @@ This project provides a solid base for chatbot-driven exploration of structured 
 ---
 
 ## Contributions & Feedback
+Pull requests, bug reports, and feature ideas welcome!
 
-Feel free to open issues, contribute improvements, or suggest new features!

@@ -86,5 +86,3 @@ def generate_embeddings():
     elapsed = time.time() - start_time
     logging.info(f"Embeddings generated for {len(df)} records and saved in {elapsed:.2f} seconds.")
 
-if __name__ == "__main__":
-    generate_embeddings()

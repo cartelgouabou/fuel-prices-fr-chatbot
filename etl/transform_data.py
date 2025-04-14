@@ -7,14 +7,6 @@ from utilities.utils import get_latest_processed_file
 # Configure logging
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
-# Automatically define data_path as '../data'
-data_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '../data'))
-
-# Check if data directory exists, if not log a message and exit
-if not os.path.exists(data_path):
-    logging.error("Data directory not found. Please run fetch_data.py first.")
-    exit(1)
-
 def load_latest_raw_data(data_path, filename_starts_with):
     """
     Retrieve the latest raw JSON data file and load its content.
@@ -128,5 +120,3 @@ def transform_data(data_path):
     logging.info(f"Data transformed and saved: {len(df)} records in {processed_data_file}")
     return df
 
-if __name__ == "__main__":
-    transform_data(data_path)

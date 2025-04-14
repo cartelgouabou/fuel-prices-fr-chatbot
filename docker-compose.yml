@@ -1,0 +1,35 @@
+services:
+  etl:
+    build: .
+    container_name: fuel_etl
+    command: python etl/run_etl.py
+    volumes:
+      - ./data:/app/data
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  streamlit:
+    build: .
+    container_name: fuel_chatbot_ui
+    command: streamlit run app/chatbot.py --server.port=8501 --server.enableCORS=false --server.enableXsrfProtection=false
+    ports:
+      - "8501:8501"
+    depends_on:
+      - etl
+    volumes:
+      - ./data:/app/data
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  chainlit:
+    build: .
+    container_name: fuel_chainlit_ui
+    command: chainlit run app/chatbot_chainlit.py --host 0.0.0.0 --port 8000 -w
+    ports:
+      - "8000:8000"
+    depends_on:
+      - etl
+    volumes:
+      - ./data:/app/data
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
